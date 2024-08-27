@@ -1,0 +1,64 @@
+---
+# Disks
+# https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks
+
+- name: Check the host to see whether we've already configured the disks
+  ansible.builtin.stat:
+    path: /tmp/disk_completed
+  register: disks_completed
+
+- name: Make GPT label on primary disk
+  ansible.builtin.command: "parted -s {{ main_disk }} mklabel gpt"
+  register: gpt_label
+  changed_when: false
+  when:
+    - not disks_completed.stat.exists
+
+- name: Create Grub BIOS Partition
+  community.general.parted:
+    device: "{{ main_disk }}"
+    number: 1
+    part_start: '0%'
+    part_end: '4MiB'
+    flags: ["bios_grub"]
+    state: present
+    name: gpt
+  when:
+    - firmware_type == 'bios'
+    - not disks_completed.stat.exists
+
+# For /boot on BIOS we do not do the same as with EFI but we need to set a part_start since we have the bios_grub partition before it.
+# For UEFI bot it is very important that the esp and the boot flags are present on the
+# EFI system partition. Just setting 'esp' is enough as this is shorthand for 'esp, boot'.
+- name: Create /boot partition
+  community.general.parted:
+    device: "{{ main_disk }}"
+    number: "{{ boot_id }}"
+    part_start: "{{ '4MiB' if firmware_type =='bios' else '0%' }}"
+    part_end: 1GiB
+    flags: ["esp"]
+    state: present
+    label: gpt
+  when:
+    - not disks_completed.stat.exists
+
+- name: Partitioning / partition
+  community.general.parted:
+    device: "{{ main_disk }}"
+    number: "{{ root_id }}"
+    part_start: 1GiB
+    part_end: "100%"
+    state: present
+    label: gpt
+  when:
+    - not disks_completed.stat.exists
+
+- name: Write state file to show this task has completed
+  ansible.builtin.file:
+    path: /tmp/disks_completed
+    state: touch
+    owner: root
+    group: root
+    mode: '0644'
+  when:
+    - not disks_completed.stat.exists

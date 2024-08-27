@@ -1,0 +1,42 @@
+---
+# Configure passwords
+root_password: "gentoo"
+unprivileged_user: user
+unprivileged_user_password: "gentoo"
+
+# Configure Ansible connection options
+ansible_become_pass: "{{ root_password }}"
+ansible_pass: "{{ root_password }}"
+ansible_ssh_pass: "{{ root_password }}"
+
+# Configure our boot firmware type (acceptable values for firmware_type are 'bios' or 'efi')
+firmware_type: 'efi'
+
+# Configure installed system options
+gentoo_hostname: gentoo
+timezone: America/Chicago
+
+# Configure our package mirror
+mirror: "{{ mirror_baseurl | default('https://www.mirrorservice.org')}}/sites/distfiles.gentoo.org"
+
+# Configuring networking
+domain: localdomain
+management_interfaces: "{{ ansible_default_ipv4.interface }}"
+gateway: "{{ ansible_default_ipv4.gateway }}"
+netmask: "{{ ansible_default_ipv4.netmask }}"
+
+# Configure disk layout
+# Note: If testing in libvirt/QEMU then be aware that the main disk will turn up as /dev/vda
+force_format: true
+main_disk: /dev/vdb
+mainfs_type: btrfs
+encrypt_disk: true
+
+# Auto-calculate boot and root partition offsets
+boot_id: "{{ '2' if firmware_type == 'bios' else '1' }}"
+root_id: "{{ '3' if firmware_type == 'bios' else '2' }}"
+boot_partition: '{{ main_disk }}{{ boot_id }}'
+root_partition: '{{ main_disk }}{{ root_id }}'
+
+# Configure eselect profile here
+eselect_profile: 'default/linux/amd64/17.1/desktop/gnome/systemd'
